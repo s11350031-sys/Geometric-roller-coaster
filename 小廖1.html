@@ -1,0 +1,909 @@
+<!DOCTYPE html>
+<html lang="zh-TW" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>雲霄飛車的微分幾何與物理教室：探索 TNB 標架與曲率</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        darkBg: '#0f172a',
+                        cardBg: '#1e293b',
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Three.js and OrbitControls -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <!-- MathJax for rendering equations -->
+    <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <!-- FontAwesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #475569; }
+    </style>
+</head>
+<body class="bg-darkBg text-slate-100 min-h-screen flex flex-col overflow-x-hidden">
+
+    <!-- Header / Navbar -->
+    <header class="bg-cardBg/80 backdrop-blur-md border-b border-slate-800 sticky top-0 z-50 px-6 py-3 flex items-center justify-between">
+        <div class="flex items-center space-x-3">
+            <div class="bg-gradient-to-tr from-indigo-500 to-pink-500 p-2.5 rounded-xl shadow-lg shadow-indigo-500/20">
+                <i class="fa-solid fa-mountain-roller-coaster text-white text-xl"></i>
+            </div>
+            <div>
+                <h1 class="text-lg font-bold bg-gradient-to-r from-indigo-400 via-purple-300 to-pink-400 bg-clip-text text-transparent">
+                    雲霄飛車與 TNB 標架微幾何實驗室
+                </h1>
+                <p class="text-xs text-slate-400">探索曲線切向量 T、主法向量 N、副法向量 B 與物理加速度</p>
+            </div>
+        </div>
+        <div class="flex items-center space-x-3">
+            <button onclick="toggleModal('theoryModal')" class="px-3 py-1.5 text-xs font-medium rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition flex items-center space-x-1.5">
+                <i class="fa-solid fa-book-open text-indigo-400"></i>
+                <span>微積分原理導讀</span>
+            </button>
+            <button onclick="toggleModal('formulaModal')" class="px-3 py-1.5 text-xs font-medium rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition flex items-center space-x-1.5">
+                <i class="fa-solid fa-square-root-variable text-pink-400"></i>
+                <span>數學公式速查</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Content Grid -->
+    <main class="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 p-4 max-w-[1920px] mx-auto w-full">
+        
+        <!-- Left Column: 3D Visualization & Control Bar (Col 1-8) -->
+        <div class="lg:col-span-8 flex flex-col space-y-4">
+            
+            <!-- 3D Canvas Container -->
+            <div class="relative bg-cardBg border border-slate-800 rounded-2xl overflow-hidden shadow-2xl flex-1 min-h-[500px] flex flex-col group">
+                <div id="canvas-container" class="w-full flex-1 relative cursor-grab active:cursor-grabbing">
+                    <!-- Overlay Legend -->
+                    <div class="absolute top-4 left-4 bg-slate-900/80 backdrop-blur-md border border-slate-700/60 p-3 rounded-xl shadow-lg text-xs space-y-2 pointer-events-none z-10">
+                        <div class="font-semibold text-slate-300 mb-1 flex items-center space-x-1.5">
+                            <i class="fa-solid fa-compass text-indigo-400"></i>
+                            <span>TNB 標架圖例</span>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <span class="w-3 h-3 rounded-full bg-red-500 inline-block shadow-sm shadow-red-500/50"></span>
+                            <span class="text-slate-300">$\mathbf{T}$ (切向量 - 運動方向)</span>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <span class="w-3 h-3 rounded-full bg-emerald-500 inline-block shadow-sm shadow-emerald-500/50"></span>
+                            <span class="text-slate-300">$\mathbf{N}$ (主法向量 - 向心/曲率中心)</span>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <span class="w-3 h-3 rounded-full bg-blue-500 inline-block shadow-sm shadow-blue-500/50"></span>
+                            <span class="text-slate-300">$\mathbf{B}$ (副法向量 - 軌道扭率)</span>
+                        </div>
+                    </div>
+
+                    <!-- Camera View Help -->
+                    <div class="absolute top-4 right-4 bg-slate-900/80 backdrop-blur-md border border-slate-700/60 px-3 py-2 rounded-xl text-xs text-slate-400 pointer-events-none z-10 flex items-center space-x-2">
+                        <i class="fa-solid fa-computer-mouse text-indigo-400"></i>
+                        <span>左鍵旋轉 | 右鍵平移 | 滾輪縮放</span>
+                    </div>
+                </div>
+
+                <!-- Simulation Control Toolbar -->
+                <div class="bg-slate-900/90 border-t border-slate-800 p-3 flex flex-wrap items-center justify-between gap-3">
+                    <div class="flex items-center space-x-2">
+                        <button id="playBtn" onclick="togglePlay()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-xl font-medium text-sm transition flex items-center space-x-2 shadow-lg shadow-indigo-600/30">
+                            <i id="playIcon" class="fa-solid fa-play"></i>
+                            <span id="playText">開始模擬</span>
+                        </button>
+                        <button onclick="resetSimulation()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 px-3.5 py-2 rounded-xl font-medium text-sm transition border border-slate-700 flex items-center space-x-1.5">
+                            <i class="fa-solid fa-rotate-right"></i>
+                            <span>重設</span>
+                        </button>
+                        <button onclick="stepSimulation()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 px-3.5 py-2 rounded-xl font-medium text-sm transition border border-slate-700 flex items-center space-x-1.5">
+                            <i class="fa-solid fa-forward-step"></i>
+                            <span>單步執行</span>
+                        </button>
+                    </div>
+
+                    <div class="flex items-center space-x-4 flex-1 max-w-xs mx-4">
+                        <span class="text-xs text-slate-400 whitespace-nowrap">播放進度:</span>
+                        <input type="range" id="progressSlider" min="0" max="1" step="0.001" value="0" 
+                            class="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-indigo-500">
+                    </div>
+
+                    <div class="flex items-center space-x-2">
+                        <span class="text-xs text-slate-400">視角追蹤:</span>
+                        <select id="cameraMode" onchange="changeCameraMode()" class="bg-slate-800 text-slate-200 text-xs rounded-lg px-2.5 py-1.5 border border-slate-700 focus:outline-none focus:ring-1 focus:ring-indigo-500">
+                            <option value="free">自由視角 (Free Orbit)</option>
+                            <option value="chase">第一人稱 / 車上視角 (Chase Car)</option>
+                            <option value="top">俯視圖 (Top-Down)</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Real-time Metrics Dashboard Bar -->
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div class="bg-cardBg border border-slate-800 p-3.5 rounded-xl shadow-md">
+                    <div class="text-xs text-slate-400 flex items-center justify-between mb-1">
+                        <span>當前高度 $h(t)$</span>
+                        <i class="fa-solid fa-mountain text-pink-400"></i>
+                    </div>
+                    <div class="text-lg font-bold text-slate-100" id="valHeight">0.00 <span class="text-xs font-normal text-slate-400">m</span></div>
+                </div>
+                <div class="bg-cardBg border border-slate-800 p-3.5 rounded-xl shadow-md">
+                    <div class="text-xs text-slate-400 flex items-center justify-between mb-1">
+                        <span>當前速度 $v(t)$</span>
+                        <i class="fa-solid fa-gauge-high text-indigo-400"></i>
+                    </div>
+                    <div class="text-lg font-bold text-slate-100" id="valSpeed">0.00 <span class="text-xs font-normal text-slate-400">m/s</span></div>
+                </div>
+                <div class="bg-cardBg border border-slate-800 p-3.5 rounded-xl shadow-md">
+                    <div class="text-xs text-slate-400 flex items-center justify-between mb-1">
+                        <span>曲率 $\kappa$</span>
+                        <i class="fa-solid fa-circle-notch text-emerald-400"></i>
+                    </div>
+                    <div class="text-lg font-bold text-slate-100" id="valCurvature">0.00 <span class="text-xs font-normal text-slate-400">m⁻¹</span></div>
+                </div>
+                <div class="bg-cardBg border border-slate-800 p-3.5 rounded-xl shadow-md">
+                    <div class="text-xs text-slate-400 flex items-center justify-between mb-1">
+                        <span>曲率半徑 $\rho = 1/\kappa$</span>
+                        <i class="fa-solid fa-ruler text-amber-400"></i>
+                    </div>
+                    <div class="text-lg font-bold text-slate-100" id="valRadius">0.00 <span class="text-xs font-normal text-slate-400">m</span></div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Right Column: Parameters & Differential Geometry Readout (Col 9-12) -->
+        <div class="lg:col-span-4 flex flex-col space-y-4">
+            
+            <!-- Control Tabs Container -->
+            <div class="bg-cardBg border border-slate-800 rounded-2xl shadow-xl overflow-hidden flex flex-col">
+                
+                <!-- Tab Headers -->
+                <div class="flex border-b border-slate-800 bg-slate-900/50">
+                    <button onclick="switchTab('geometry')" id="tabBtn-geometry" class="flex-1 py-3 text-xs font-semibold text-indigo-400 border-b-2 border-indigo-500 bg-slate-800/40 transition">
+                        <i class="fa-solid fa-shapes mr-1.5"></i>軌道幾何參數
+                    </button>
+                    <button onclick="switchTab('physics')" id="tabBtn-physics" class="flex-1 py-3 text-xs font-semibold text-slate-400 border-b-2 border-transparent hover:text-slate-200 transition">
+                        <i class="fa-solid fa-gauge mr-1.5"></i>物理動態參數
+                    </button>
+                    <button onclick="switchTab('tnb')" id="tabBtn-tnb" class="flex-1 py-3 text-xs font-semibold text-slate-400 border-b-2 border-transparent hover:text-slate-200 transition">
+                        <i class="fa-solid fa-vector-square mr-1.5"></i>TNB 數值儀表
+                    </button>
+                </div>
+
+                <!-- Tab Content 1: Geometry -->
+                <div id="tabContent-geometry" class="p-4 space-y-4 text-xs">
+                    <div>
+                        <label class="block text-slate-300 font-medium mb-1.5 flex justify-between">
+                            <span>軌道樣式選擇 (Track Type)</span>
+                        </label>
+                        <select id="trackType" onchange="updateTrackType()" class="w-full bg-slate-900 text-slate-200 rounded-xl px-3 py-2 border border-slate-700 focus:outline-none focus:ring-1 focus:ring-indigo-500">
+                            <option value="sine">正弦波起伏軌道 (Sine Roller Coaster)</option>
+                            <option value="loop">立體垂直迴圈軌道 (Vertical Loop)</option>
+                            <option value="helix">螺旋上升/下降軌道 (Helix Spiral)</option>
+                            <option value="heart">3D 心形情境軌道 (Heart Curve)</option>
+                        </select>
+                    </div>
+
+                    <div class="space-y-3 pt-2 border-t border-slate-800">
+                        <div>
+                            <div class="flex justify-between mb-1">
+                                <span class="text-slate-300">軌道振幅 / 高度級距 ($A$):</span>
+                                <span id="paramValAmplitude" class="font-mono text-indigo-400">12.0 m</span>
+                            </div>
+                            <input type="range" id="paramAmplitude" min="5" max="25" step="0.5" value="12" 
+                                oninput="onParameterChange()" class="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-indigo-500">
+                        </div>
+
+                        <div>
+                            <div class="flex justify-between mb-1">
+                                <span class="text-slate-300">空間頻率 / 圈數 ($k$):</span>
+                                <span id="paramValFrequency" class="font-mono text-indigo-400">2.0</span>
+                            </div>
+                            <input type="range" id="paramFrequency" min="1" max="4" step="0.5" value="2" 
+                                oninput="onParameterChange()" class="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-indigo-500">
+                        </div>
+
+                        <div>
+                            <div class="flex justify-between mb-1">
+                                <span class="text-slate-300">軌道水平半徑 ($R$):</span>
+                                <span id="paramValRadius" class="font-mono text-indigo-400">15.0 m</span>
+                            </div>
+                            <input type="range" id="paramRadius" min="8" max="25" step="1" value="15" 
+                                oninput="onParameterChange()" class="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-indigo-500">
+                        </div>
+
+                        <div>
+                            <div class="flex justify-between mb-1">
+                                <span class="text-slate-300">軌道總長度微調 (Scale):</span>
+                                <span id="paramValScale" class="font-mono text-indigo-400">1.0</span>
+                            </div>
+                            <input type="range" id="paramScale" min="0.5" max="2" step="0.1" value="1.0" 
+                                oninput="onParameterChange()" class="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-indigo-500">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab Content 2: Physics -->
+                <div id="tabContent-physics" class="p-4 space-y-4 text-xs hidden">
+                    <div class="space-y-3">
+                        <div>
+                            <div class="flex justify-between mb-1">
+                                <span class="text-slate-300">初速度 ($v_0$):</span>
+                                <span id="paramValV0" class="font-mono text-indigo-400">5.0 m/s</span>
+                            </div>
+                            <input type="range" id="paramV0" min="0" max="15" step="0.5" value="5" 
+                                oninput="onPhysicsParameterChange()" class="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-indigo-500">
+                        </div>
+
+                        <div>
+                            <div class="flex justify-between mb-1">
+                                <span class="text-slate-300">車輛質量 ($m$):</span>
+                                <span id="paramValMass" class="font-mono text-indigo-400">500 kg</span>
+                            </div>
+                            <input type="range" id="paramMass" min="100" max="2000" step="50" value="500" 
+                                oninput="onPhysicsParameterChange()" class="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-indigo-500">
+                        </div>
+
+                        <div>
+                            <div class="flex justify-between mb-1">
+                                <span class="text-slate-300">摩擦係數 ($\mu$):</span>
+                                <span id="paramValFriction" class="font-mono text-indigo-400">0.01</span>
+                            </div>
+                            <input type="range" id="paramFriction" min="0" max="0.05" step="0.005" value="0.01" 
+                                oninput="onPhysicsParameterChange()" class="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-indigo-500">
+                        </div>
+
+                        <div class="bg-slate-900/60 p-3 rounded-xl border border-slate-800 space-y-2 mt-4">
+                            <div class="font-semibold text-slate-300 flex items-center space-x-1.5">
+                                <span class="w-2 h-2 rounded-full bg-pink-500"></span>
+                                <span>動態物理能量監視</span>
+                            </div>
+                            <div class="flex justify-between text-slate-400">
+                                <span>動能 ($K$):</span>
+                                <span id="valKinetic" class="font-mono text-slate-200">0.0 kJ</span>
+                            </div>
+                            <div class="flex justify-between text-slate-400">
+                                <span>重力位能 ($U$):</span>
+                                <span id="valPotential" class="font-mono text-slate-200">0.0 kJ</span>
+                            </div>
+                            <div class="flex justify-between text-slate-400 pt-1 border-t border-slate-800">
+                                <span>總機械能 ($E$):</span>
+                                <span id="valTotalEnergy" class="font-mono text-indigo-400 font-bold">0.0 kJ</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab Content 3: TNB Vector Details -->
+                <div id="tabContent-tnb" class="p-4 space-y-3 text-xs hidden font-mono">
+                    <div class="bg-slate-900/80 p-3 rounded-xl border border-red-500/30 space-y-1">
+                        <div class="flex items-center justify-between text-red-400 font-semibold font-sans">
+                            <span>切向量 $\mathbf{T}$ (Tangent)</span>
+                            <span class="text-[10px] bg-red-500/20 px-2 py-0.5 rounded text-red-300">方向</span>
+                        </div>
+                        <div id="vectorT" class="text-slate-300 text-[11px]">( 1.00, 0.00, 0.00 )</div>
+                        <div class="text-[10px] text-slate-500 font-sans">代表速度切線方向，為位置對弧長的一階導數 $\frac{d\mathbf{r}}{ds}$</div>
+                    </div>
+
+                    <div class="bg-slate-900/80 p-3 rounded-xl border border-emerald-500/30 space-y-1">
+                        <div class="flex items-center justify-between text-emerald-400 font-semibold font-sans">
+                            <span>主法向量 $\mathbf{N}$ (Normal)</span>
+                            <span class="text-[10px] bg-emerald-500/20 px-2 py-0.5 rounded text-emerald-300">向心</span>
+                        </div>
+                        <div id="vectorN" class="text-slate-300 text-[11px]">( 0.00, 1.00, 0.00 )</div>
+                        <div class="text-[10px] text-slate-500 font-sans">指向曲率中心，決定向心加速度方向 $\frac{d\mathbf{T}}{ds} / \kappa$</div>
+                    </div>
+
+                    <div class="bg-slate-900/80 p-3 rounded-xl border border-blue-500/30 space-y-1">
+                        <div class="flex items-center justify-between text-blue-400 font-semibold font-sans">
+                            <span>副法向量 $\mathbf{B}$ (Binormal)</span>
+                            <span class="text-[10px] bg-blue-500/20 px-2 py-0.5 rounded text-blue-300">扭率</span>
+                        </div>
+                        <div id="vectorB" class="text-slate-300 text-[11px]">( 0.00, 0.00, 1.00 )</div>
+                        <div class="text-[10px] text-slate-500 font-sans">垂直於 $\mathbf{T}$ 與 $\mathbf{N}$，即 $\mathbf{B} = \mathbf{T} \times \mathbf{N}$，反映軌道扭曲</div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Quick Educational Tip Card -->
+            <div class="bg-cardBg border border-slate-800 p-4 rounded-2xl shadow-xl flex items-start space-x-3">
+                <div class="bg-indigo-500/10 p-2.5 rounded-xl text-indigo-400 shrink-0">
+                    <i class="fa-solid fa-lightbulb text-base"></i>
+                </div>
+                <div class="text-xs space-y-1.5">
+                    <div class="font-semibold text-slate-200">為什麼 TNB 標架對雲霄飛車很重要？</div>
+                    <p class="text-slate-400 leading-relaxed">
+                        當雲霄飛車疾馳時，乘客感受到的 G 力與加速度完美契合 Frenet-Serret 公式。切向加速度改變速率，而主法向量 $\mathbf{N}$ 產生的向心加速度決定了乘客被壓向座位或側向甩動的感受！
+                    </p>
+                </div>
+            </div>
+
+        </div>
+
+    </main>
+
+    <!-- Modal 1: Theory Guide -->
+    <div id="theoryModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-cardBg border border-slate-700 w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+            <div class="p-4 border-b border-slate-700/80 flex items-center justify-between bg-slate-900/50">
+                <h3 class="font-bold text-sm text-slate-200 flex items-center space-x-2">
+                    <i class="fa-solid fa-book-open text-indigo-400"></i>
+                    <span>微積分與幾何原理導讀：TNB 標架</span>
+                </h3>
+                <button onclick="toggleModal('theoryModal')" class="text-slate-400 hover:text-slate-200 text-sm">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div class="p-6 overflow-y-auto space-y-4 text-xs text-slate-300 leading-relaxed">
+                <div class="space-y-2">
+                    <h4 class="font-bold text-indigo-300 text-sm">1. 弧長參數化與軌道曲線 $\mathbf{r}(t)$</h4>
+                    <p>在三維空間中，雲霄飛車的軌道可以表示為位置向量函數 $\mathbf{r}(t) = (x(t), y(t), z(t))$。若以弧長 $s$ 重新參數化，使得單位切向量的長度恆為 1，則能精確分析幾何性質。</p>
+                </div>
+                <div class="space-y-2">
+                    <h4 class="font-bold text-indigo-300 text-sm">2. TNB 標架 (Frenet-Serret Frame)</h4>
+                    <p>在軌道上的任一平滑點，都可以建立一組動態的正交標架：</p>
+                    <ul class="list-disc pl-5 space-y-1 text-slate-300">
+                        <li><strong class="text-red-400">切向量 $\mathbf{T}$ (Tangent)：</strong>軌道的切線方向，即小車前進的方向。<br>$$\mathbf{T} = \frac{\mathbf{r}'(t)}{|\mathbf{r}'(t)|}$$</li>
+                        <li><strong class="text-emerald-400">主法向量 $\mathbf{N}$ (Normal)：</strong>指向曲線彎曲的內部（曲率中心），對應向心力方向。<br>$$\mathbf{N} = \frac{\mathbf{T}'(s)}{|\mathbf{T}'(s)|}$$</li>
+                        <li><strong class="text-blue-400">副法向量 $\mathbf{B}$ (Binormal)：</strong>與 $\mathbf{T}$ 和 $\mathbf{N}$ 垂直的外積向量。<br>$$\mathbf{B} = \mathbf{T} \times \mathbf{N}$$</li>
+                    </ul>
+                </div>
+                <div class="space-y-2">
+                    <h4 class="font-bold text-indigo-300 text-sm">3. 曲率 $\kappa$ 與曲率半徑 $\rho$</h4>
+                    <p>曲率 $\kappa = |\frac{d\mathbf{T}}{ds}|$ 代表曲線彎曲的劇烈程度。曲率半徑 $\rho = \frac{1}{\kappa}$ 則是與曲線在該點最密合的「密切圓 (Osculating Circle)」半徑。曲率越大，過彎時的向心加速度就越大！</p>
+                </div>
+            </div>
+            <div class="p-4 border-t border-slate-700/80 bg-slate-900/50 flex justify-end">
+                <button onclick="toggleModal('theoryModal')" class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-xl text-xs font-medium transition">
+                    了解，關閉視窗
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal 2: Formula Quick Reference -->
+    <div id="formulaModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-cardBg border border-slate-700 w-full max-w-xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+            <div class="p-4 border-b border-slate-700/80 flex items-center justify-between bg-slate-900/50">
+                <h3 class="font-bold text-sm text-slate-200 flex items-center space-x-2">
+                    <i class="fa-solid fa-square-root-variable text-pink-400"></i>
+                    <span>數學公式速查表</span>
+                </h3>
+                <button onclick="toggleModal('formulaModal')" class="text-slate-400 hover:text-slate-200 text-sm">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div class="p-6 overflow-y-auto space-y-4 text-xs text-slate-300">
+                <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-800 space-y-1">
+                    <div class="font-semibold text-indigo-300">速度與能量守恆公式</div>
+                    <div class="text-slate-200 font-mono py-1">$$v = \sqrt{v_0^2 + 2g(h_0 - h) - \text{friction}}$$</div>
+                </div>
+                <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-800 space-y-1">
+                    <div class="font-semibold text-emerald-300">曲率計算公式</div>
+                    <div class="text-slate-200 font-mono py-1">$$\kappa = \frac{|\mathbf{r}'(t) \times \mathbf{r}''(t)|}{|\mathbf{r}'(t)|^3}$$</div>
+                </div>
+                <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-800 space-y-1">
+                    <div class="font-semibold text-blue-300">Frenet-Serret 微分公式</div>
+                    <div class="text-slate-200 font-mono py-1">$$\frac{d\mathbf{T}}{ds} = \kappa \mathbf{N}, \quad \frac{d\mathbf{B}}{ds} = -\tau \mathbf{N}, \quad \frac{d\mathbf{N}}{ds} = -\kappa \mathbf{T} + \tau \mathbf{B}$$</div>
+                </div>
+            </div>
+            <div class="p-4 border-t border-slate-700/80 bg-slate-900/50 flex justify-end">
+                <button onclick="toggleModal('formulaModal')" class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-xl text-xs font-medium transition">
+                    關閉
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Three.js Simulation & Physics Script -->
+    <script>
+        let scene, camera, renderer, controls;
+        let trackCurve = null;
+        let trackMesh = null;
+        let tnbArrows = { T: null, N: null, B: null };
+        let coasterCar = null;
+        let osculatingCircleMesh = null;
+
+        let isPlaying = false;
+        let simulationProgress = 0; // 0 to 1 along the curve
+        let cameraMode = 'free';
+
+        // Physics & Geometry Configuration
+        const config = {
+            trackType: 'sine',
+            amplitude: 12.0,
+            frequency: 2.0,
+            radius: 15.0,
+            scale: 1.0,
+            v0: 5.0,
+            mass: 500,
+            friction: 0.01,
+            g: 9.81
+        };
+
+        // Custom Parametric Curve Classes for Different Track Types
+        class SineRollerCoasterCurve extends THREE.Curve {
+            constructor(scale = 1, amp = 12, freq = 2, rad = 15) {
+                super();
+                this.scale = scale;
+                this.amp = amp;
+                this.freq = freq;
+                this.rad = rad;
+            }
+            getPoint(t, optionalTarget = new THREE.Vector3()) {
+                const theta = t * Math.PI * 2 * this.freq;
+                const x = this.rad * Math.cos(t * Math.PI * 2);
+                const z = this.rad * Math.sin(t * Math.PI * 2);
+                const y = this.amp * Math.sin(theta) + this.amp + 2;
+                return optionalTarget.set(x * this.scale, y, z * this.scale);
+            }
+        }
+
+        class LoopRollerCoasterCurve extends THREE.Curve {
+            constructor(scale = 1, amp = 15, freq = 1, rad = 18) {
+                super();
+                this.scale = scale;
+                this.amp = amp;
+                this.rad = rad;
+            }
+            getPoint(t, optionalTarget = new THREE.Vector3()) {
+                // Combined loop and straight/turns
+                const angle = t * Math.PI * 2;
+                let x, y, z;
+                if (t < 0.6) {
+                    // Vertical loop section
+                    const lt = t / 0.6;
+                    const loopAngle = lt * Math.PI * 2;
+                    x = (this.rad - 10 * Math.cos(loopAngle)) * 0.8;
+                    y = 10 * Math.sin(loopAngle) + 12;
+                    z = (lt - 0.5) * 30;
+                } else {
+                    // Return curve section
+                    const rt = (t - 0.6) / 0.4;
+                    const rAngle = rt * Math.PI;
+                    x = this.rad * Math.cos(rAngle);
+                    y = 12 * Math.sin(rAngle) + 2;
+                    z = 15 * (1 - rt) - 15 * rt;
+                }
+                return optionalTarget.set(x * this.scale, y, z * this.scale);
+            }
+        }
+
+        class HelixRollerCoasterCurve extends THREE.Curve {
+            constructor(scale = 1, amp = 20, freq = 3, rad = 14) {
+                super();
+                this.scale = scale;
+                this.amp = amp;
+                this.freq = freq;
+                this.rad = rad;
+            }
+            getPoint(t, optionalTarget = new THREE.Vector3()) {
+                const angle = t * Math.PI * 2 * this.freq;
+                const x = this.rad * Math.cos(angle);
+                const z = this.rad * Math.sin(angle);
+                const y = t * this.amp + 2;
+                return optionalTarget.set(x * this.scale, y, z * this.scale);
+            }
+        }
+
+        class HeartRollerCoasterCurve extends THREE.Curve {
+            constructor(scale = 1, amp = 10, freq = 1, rad = 1) {
+                super();
+                this.scale = scale;
+                this.amp = amp;
+            }
+            getPoint(t, optionalTarget = new THREE.Vector3()) {
+                const theta = t * Math.PI * 2;
+                // 3D Heart curve parametric equations
+                const x = 16 * Math.pow(Math.sin(theta), 3);
+                const y = 13 * Math.cos(theta) - 5 * Math.cos(2*theta) - 2 * Math.cos(3*theta) - Math.cos(4*theta);
+                const z = 10 * Math.sin(theta * 2);
+                return optionalTarget.set(x * 0.8 * this.scale, (y + 15) * 0.8, z * 0.8 * this.scale);
+            }
+        }
+
+        function initThree() {
+            const container = document.getElementById('canvas-container');
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color('#0f172a');
+            scene.fog = new THREE.FogExp2('#0f172a', 0.008);
+
+            camera = new THREE.PerspectiveCamera(60, container.clientWidth / container.clientHeight, 0.1, 1000);
+            camera.position.set(30, 25, 40);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.shadowMap.enabled = true;
+            container.appendChild(renderer.domElement);
+
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+
+            // Lighting
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+            scene.add(ambientLight);
+
+            const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            dirLight.position.set(40, 60, 40);
+            dirLight.castShadow = true;
+            scene.add(dirLight);
+
+            const pointLight = new THREE.PointLight(0x6366f1, 1, 50);
+            pointLight.position.set(0, 20, 0);
+            scene.add(pointLight);
+
+            // Ground Grid & Environment
+            const grid = new THREE.GridHelper(100, 50, 0x4f46e5, 0x1e293b);
+            grid.position.y = -0.1;
+            scene.add(grid);
+
+            // Build initial track & objects
+            rebuildTrack();
+            createCoasterCar();
+            createTNBArrows();
+            createOsculatingCircle();
+
+            window.addEventListener('resize', onWindowResize);
+
+            // Progress Slider Event
+            document.getElementById('progressSlider').addEventListener('input', (e) => {
+                simulationProgress = parseFloat(e.target.value);
+                updateSimulationState(0);
+            });
+
+            // Start animation loop
+            animate();
+        }
+
+        function rebuildTrack() {
+            if (trackMesh) scene.remove(trackMesh);
+
+            // Select curve based on config
+            switch(config.trackType) {
+                case 'sine':
+                    trackCurve = new SineRollerCoasterCurve(config.scale, config.amplitude, config.frequency, config.radius);
+                    break;
+                case 'loop':
+                    trackCurve = new LoopRollerCoasterCurve(config.scale, config.amplitude, config.frequency, config.radius);
+                    break;
+                case 'helix':
+                    trackCurve = new HelixRollerCoasterCurve(config.scale, config.amplitude, config.frequency, config.radius);
+                    break;
+                case 'heart':
+                    trackCurve = new HeartRollerCoasterCurve(config.scale, config.amplitude, config.frequency, config.radius);
+                    break;
+            }
+
+            // Tube geometry for track
+            const tubeGeo = new THREE.TubeGeometry(trackCurve, 300, 0.4, 8, true);
+            const tubeMat = new THREE.MeshStandardMaterial({ 
+                color: 0x6366f1, 
+                roughness: 0.3, 
+                metalness: 0.8,
+                emissive: 0x1e1b4b
+            });
+            trackMesh = new THREE.Mesh(tubeGeo, tubeMat);
+            scene.add(trackMesh);
+
+            // Add support pillars
+            buildSupportPillars();
+        }
+
+        function buildSupportPillars() {
+            // Remove old pillars if any
+            scene.children.forEach(child => {
+                if (child.userData && child.userData.isPillar) {
+                    scene.remove(child);
+                }
+            });
+
+            const pillarMat = new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.5, roughness: 0.5 });
+            for (let i = 0; i <= 1; i += 0.05) {
+                const pt = trackCurve.getPoint(i);
+                if (pt.y > 1) {
+                    const pillarGeo = new THREE.CylinderGeometry(0.2, 0.2, pt.y, 6);
+                    const pillar = new THREE.Mesh(pillarGeo, pillarMat);
+                    pillar.position.set(pt.x, pt.y / 2, pt.z);
+                    pillar.userData.isPillar = true;
+                    scene.add(pillar);
+                }
+            }
+        }
+
+        function createCoasterCar() {
+            if (coasterCar) scene.remove(coasterCar);
+
+            const carGroup = new THREE.Group();
+            
+            // Car body
+            const bodyGeo = new THREE.BoxGeometry(1.2, 0.8, 2.0);
+            const bodyMat = new THREE.MeshStandardMaterial({ color: 0xec4899, metalness: 0.6, roughness: 0.2 });
+            const body = new THREE.Mesh(bodyGeo, bodyMat);
+            body.position.y = 0.5;
+            carGroup.add(body);
+
+            // Passengers / seats
+            const seatGeo = new THREE.BoxGeometry(0.8, 0.6, 0.8);
+            const seatMat = new THREE.MeshStandardMaterial({ color: 0x0f172a });
+            const seat = new THREE.Mesh(seatGeo, seatMat);
+            seat.position.set(0, 1.0, 0);
+            carGroup.add(seat);
+
+            coasterCar = carGroup;
+            scene.add(coasterCar);
+        }
+
+        function createTNBArrows() {
+            if (tnbArrows.T) {
+                scene.remove(tnbArrows.T);
+                scene.remove(tnbArrows.N);
+                scene.remove(tnbArrows.B);
+            }
+
+            // T: Red, N: Green, B: Blue
+            tnbArrows.T = new THREE.ArrowHelper(new THREE.Vector3(1,0,0), new THREE.Vector3(0,0,0), 3, 0xef4444, 0.8, 0.4);
+            tnbArrows.N = new THREE.ArrowHelper(new THREE.Vector3(0,1,0), new THREE.Vector3(0,0,0), 3, 0x10b981, 0.8, 0.4);
+            tnbArrows.B = new THREE.ArrowHelper(new THREE.Vector3(0,0,1), new THREE.Vector3(0,0,0), 3, 0x3b82f6, 0.8, 0.4);
+
+            scene.add(tnbArrows.T);
+            scene.add(tnbArrows.N);
+            scene.add(tnbArrows.B);
+        }
+
+        function createOsculatingCircle() {
+            if (osculatingCircleMesh) scene.remove(osculatingCircleMesh);
+            const circleGeo = new THREE.RingGeometry(0, 1, 32);
+            // Wireframe circle or translucent disc
+            const circleMat = new THREE.MeshBasicMaterial({ 
+                color: 0xf59e0b, 
+                side: THREE.DoubleSide, 
+                transparent: true, 
+                opacity: 0.3,
+                wireframe: true 
+            });
+            osculatingCircleMesh = new THREE.Mesh(circleGeo, circleMat);
+            scene.add(osculatingCircleMesh);
+        }
+
+        function updateSimulationState(delta) {
+            if (isPlaying) {
+                // Advance progress based on simulated velocity
+                const speedFactor = 0.15; // tuning speed coefficient
+                simulationProgress += speedFactor * (delta > 0 ? delta : 0.016);
+                if (simulationProgress > 1) simulationProgress = 0;
+                document.getElementById('progressSlider').value = simulationProgress;
+            }
+
+            const t = simulationProgress;
+
+            // 1. Position vector r(t)
+            const pos = trackCurve.getPoint(t);
+
+            // 2. Numerical Derivatives using finite differences for TNB & Curvature
+            const dt = 0.0001;
+            const p1 = trackCurve.getPoint((t - dt + 1) % 1);
+            const p2 = trackCurve.getPoint((t + dt) % 1);
+            const p_center = trackCurve.getPoint(t);
+
+            const dr = new THREE.Vector3().subVectors(p2, p1).normalize(); // Tangent T
+            const T = dr.clone();
+
+            // Second derivative approximation r''(t)
+            const p_prev = trackCurve.getPoint((t - 2*dt + 1) % 1);
+            const p_curr = p_center;
+            const p_next = trackCurve.getPoint((t + 2*dt) % 1);
+            
+            const v1 = new THREE.Vector3().subVectors(p_curr, p_prev);
+            const v2 = new THREE.Vector3().subVectors(p_next, p_curr);
+            const d2r = new THREE.Vector3().subVectors(v2, v1).divideScalar(dt * dt);
+
+            // Curvature kappa = |r' x r''| / |r'|^3
+            const rPrime = new THREE.Vector3().subVectors(p2, p1).divideScalar(2 * dt);
+            const crossProduct = new THREE.Vector3().crossVectors(rPrime, d2r);
+            const rPrimeLen = rPrime.length();
+            const curvature = rPrimeLen > 0 ? crossProduct.length() / Math.pow(rPrimeLen, 3) : 0;
+            const radius = curvature > 0 ? 1 / curvature : 1000;
+
+            // Normal N = T' / |T'| or derived from r''
+            let N = new THREE.Vector3().copy(d2r);
+            N.projectOnPlane(T);
+            if (N.lengthSq() > 0.0001) {
+                N.normalize();
+            } else {
+                N.set(0, 1, 0);
+            }
+
+            // Binormal B = T x N
+            const B = new THREE.Vector3().crossVectors(T, N).normalize();
+
+            // Update Car Position and Rotation
+            if (coasterCar) {
+                coasterCar.position.copy(pos);
+                // Align car orientation with T and B
+                const matrix = new THREE.Matrix4();
+                matrix.makeBasis(new THREE.Vector3().crossVectors(N, B), N, T.clone().negate());
+                coasterCar.quaternion.setFromRotationMatrix(matrix);
+            }
+
+            // Update TNB Arrows
+            if (tnbArrows.T) {
+                tnbArrows.T.position.copy(pos);
+                tnbArrows.T.setDirection(T);
+                tnbArrows.T.setLength(3, 0.8, 0.4);
+
+                tnbArrows.N.position.copy(pos);
+                tnbArrows.N.setDirection(N);
+                tnbArrows.N.setLength(3 * Math.min(Math.max(radius / 10, 0.5), 2), 0.8, 0.4);
+
+                tnbArrows.B.position.copy(pos);
+                tnbArrows.B.setDirection(B);
+                tnbArrows.B.setLength(3, 0.8, 0.4);
+            }
+
+            // Update Osculating Circle visualization
+            if (osculatingCircleMesh && curvature > 0.001) {
+                osculatingCircleMesh.position.copy(pos).addScaledVector(N, radius);
+                osculatingCircleMesh.scale.set(radius, radius, radius);
+                osculatingCircleMesh.lookAt(pos.clone().add(B));
+            }
+
+            // Physics calculations: Energy & Velocity based on height
+            const height = Math.max(pos.y, 0);
+            const maxH = Math.max(...Array.from({length: 20}, (_, i) => trackCurve.getPoint(i/20).y));
+            const potentialEnergy = config.mass * config.g * height / 1000; // kJ
+            const kineticEnergy = Math.max(0, (0.5 * config.mass * config.v0 * config.v0 + config.mass * config.g * (maxH - height)) / 1000); // kJ
+            const currentSpeed = Math.sqrt(2 * Math.max(0, kineticEnergy * 1000 / config.mass));
+
+            // Update UI Dashboards
+            document.getElementById('valHeight').innerHTML = height.toFixed(2) + ' <span class="text-xs font-normal text-slate-400">m</span>';
+            document.getElementById('valSpeed').innerHTML = currentSpeed.toFixed(2) + ' <span class="text-xs font-normal text-slate-400">m/s</span>';
+            document.getElementById('valCurvature').innerHTML = curvature.toFixed(4) + ' <span class="text-xs font-normal text-slate-400">m⁻¹</span>';
+            document.getElementById('valRadius').innerHTML = (radius > 999 ? '∞' : radius.toFixed(2)) + ' <span class="text-xs font-normal text-slate-400">m</span>';
+
+            document.getElementById('valKinetic').innerText = kineticEnergy.toFixed(1) + ' kJ';
+            document.getElementById('valPotential').innerText = potentialEnergy.toFixed(1) + ' kJ';
+            document.getElementById('valTotalEnergy').innerText = (kineticEnergy + potentialEnergy).toFixed(1) + ' kJ';
+
+            document.getElementById('vectorT').innerText = `( ${T.x.toFixed(2)}, ${T.y.toFixed(2)}, ${T.z.toFixed(2)} )`;
+            document.getElementById('vectorN').innerText = `( ${N.x.toFixed(2)}, ${N.y.toFixed(2)}, ${N.z.toFixed(2)} )`;
+            document.getElementById('vectorB').innerText = `( ${B.x.toFixed(2)}, ${B.y.toFixed(2)}, ${B.z.toFixed(2)} )`;
+
+            // Camera follow mode update
+            if (cameraMode === 'chase' && coasterCar) {
+                const camPos = pos.clone().addScaledVector(T, -4).add(new THREE.Vector3(0, 2, 0));
+                camera.position.copy(camPos);
+                camera.lookAt(pos.clone().addScaledVector(T, 5));
+            } else if (cameraMode === 'top') {
+                camera.position.set(0, 50, 0.1);
+                camera.lookAt(0, 0, 0);
+            }
+        }
+
+        const clock = new THREE.Clock();
+        function animate() {
+            requestAnimationFrame(animate);
+            const delta = clock.getDelta();
+            updateSimulationState(delta);
+            if (cameraMode === 'free') {
+                controls.update();
+            }
+            renderer.render(scene, camera);
+        }
+
+        function togglePlay() {
+            isPlaying = !isPlaying;
+            const btnIcon = document.getElementById('playIcon');
+            const btnText = document.getElementById('playText');
+            if (isPlaying) {
+                btnIcon.className = 'fa-solid fa-pause';
+                btnText.innerText = '暫停模擬';
+            } else {
+                btnIcon.className = 'fa-solid fa-play';
+                btnText.innerText = '開始模擬';
+            }
+        }
+
+        function resetSimulation() {
+            isPlaying = false;
+            simulationProgress = 0;
+            document.getElementById('progressSlider').value = 0;
+            document.getElementById('playIcon').className = 'fa-solid fa-play';
+            document.getElementById('playText').innerText = '開始模擬';
+            updateSimulationState(0);
+        }
+
+        function stepSimulation() {
+            isPlaying = false;
+            document.getElementById('playIcon').className = 'fa-solid fa-play';
+            document.getElementById('playText').innerText = '開始模擬';
+            simulationProgress = (simulationProgress + 0.02) % 1;
+            document.getElementById('progressSlider').value = simulationProgress;
+            updateSimulationState(0);
+        }
+
+        function changeCameraMode() {
+            cameraMode = document.getElementById('cameraMode').value;
+            if (cameraMode === 'free') {
+                controls.enabled = true;
+            } else {
+                controls.enabled = false;
+            }
+        }
+
+        function switchTab(tabName) {
+            ['geometry', 'physics', 'tnb'].forEach(t => {
+                document.getElementById(`tabContent-${t}`).classList.add('hidden');
+                document.getElementById(`tabBtn-${t}`).className = 'flex-1 py-3 text-xs font-semibold text-slate-400 border-b-2 border-transparent hover:text-slate-200 transition';
+            });
+            document.getElementById(`tabContent-${tabName}`).classList.remove('hidden');
+            document.getElementById(`tabBtn-${tabName}`).className = 'flex-1 py-3 text-xs font-semibold text-indigo-400 border-b-2 border-indigo-500 bg-slate-800/40 transition';
+        }
+
+        function toggleModal(modalId) {
+            const modal = document.getElementById(modalId);
+            modal.classList.toggle('hidden');
+        }
+
+        function onParameterChange() {
+            config.amplitude = parseFloat(document.getElementById('paramAmplitude').value);
+            config.frequency = parseFloat(document.getElementById('paramFrequency').value);
+            config.radius = parseFloat(document.getElementById('paramRadius').value);
+            config.scale = parseFloat(document.getElementById('paramScale').value);
+            config.trackType = document.getElementById('trackType').value;
+
+            document.getElementById('paramValAmplitude').innerText = config.amplitude.toFixed(1) + ' m';
+            document.getElementById('paramValFrequency').innerText = config.frequency.toFixed(1);
+            document.getElementById('paramValRadius').innerText = config.radius.toFixed(1) + ' m';
+            document.getElementById('paramValScale').innerText = config.scale.toFixed(1);
+
+            rebuildTrack();
+            updateSimulationState(0);
+        }
+
+        function onPhysicsParameterChange() {
+            config.v0 = parseFloat(document.getElementById('paramV0').value);
+            config.mass = parseFloat(document.getElementById('paramMass').value);
+            config.friction = parseFloat(document.getElementById('paramFriction').value);
+
+            document.getElementById('paramValV0').innerText = config.v0.toFixed(1) + ' m/s';
+            document.getElementById('paramValMass').innerText = config.mass + ' kg';
+            document.getElementById('paramValFriction').innerText = config.friction.toFixed(3);
+        }
+
+        function updateTrackType() {
+            config.trackType = document.getElementById('trackType').value;
+            rebuildTrack();
+            updateSimulationState(0);
+        }
+
+        function onWindowResize() {
+            const container = document.getElementById('canvas-container');
+            camera.aspect = container.clientWidth / container.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(container.clientWidth, container.clientHeight);
+        }
+
+        window.onload = function() {
+            initThree();
+        };
+    </script>
+</body>
+</html>
